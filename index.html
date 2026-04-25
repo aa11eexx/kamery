@@ -212,7 +212,7 @@
     <div class="chart-card" id="stat-shift"></div>
     <div class="stat-title">Podľa pracovníka</div>
     <div class="chart-card" id="stat-worker"></div>
-    <div class="stat-title">Podľa mesiaca</div>
+    <div class="stat-title" id="stat-month-title">Podľa mesiaca</div>
     <div class="chart-card" id="stat-month-chart"></div>
   </div>
   <div id="tab-sluzba">
@@ -633,24 +633,47 @@
         <div class="br-count">${c} <span style="font-size:11px;color:var(--muted)">${Math.round(c/totalServices*100)}%</span></div>
       </div>`).join("") : '<div style="font-size:13px;color:var(--muted)">Žiadne dáta</div>';
 
-    // By month bar chart
-    const months = ["Jan","Feb","Mar","Apr","Máj","Jún","Júl","Aug","Sep","Okt","Nov","Dec"];
-    const mCounts = months.map((_,i)=>{
-      const m = String(i+1).padStart(2,"0");
-      return filtered.filter(s=>(s.date||"").slice(5,7)===m).length;
-    });
-    const maxM = Math.max(...mCounts,1);
-    document.getElementById("stat-month-chart").innerHTML = `
-      <div style="display:flex;align-items:flex-end;gap:4px;height:80px;padding-bottom:4px">
-        ${mCounts.map((c,i)=>`
-          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
-            <div style="font-size:10px;color:var(--muted);font-weight:500">${c||""}</div>
-            <div style="width:100%;background:var(--accent);border-radius:3px 3px 0 0;height:${Math.round(c/maxM*60)+2}px;min-height:2px;opacity:${c?1:0.15}"></div>
-          </div>`).join("")}
-      </div>
-      <div style="display:flex;gap:4px;border-top:1px solid var(--border);padding-top:6px">
-        ${months.map(m=>`<div style="flex:1;text-align:center;font-size:9px;color:var(--muted)">${m}</div>`).join("")}
-      </div>`;
+    // By month/day bar chart
+    if (selMonth) {
+      // Show by day in selected month
+      const selYearNum = selYear || new Date().getFullYear();
+      const daysInMonth = new Date(selYearNum, parseInt(selMonth), 0).getDate();
+      const dayCounts = Array.from({length:daysInMonth},(_,i)=>{
+        const day = String(i+1).padStart(2,"0");
+        return filtered.filter(s=>(s.date||"").slice(8,10)===day).length;
+      });
+      const maxD = Math.max(...dayCounts,1);
+      document.getElementById("stat-month-chart").innerHTML = `
+        <div style="display:flex;align-items:flex-end;gap:2px;height:80px;padding-bottom:4px">
+          ${dayCounts.map((c,i)=>`
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+              <div style="font-size:8px;color:var(--muted);font-weight:500">${c||""}</div>
+              <div style="width:100%;background:var(--accent);border-radius:2px 2px 0 0;height:${Math.round(c/maxD*60)+2}px;min-height:2px;opacity:${c?1:0.15}"></div>
+            </div>`).join("")}
+        </div>
+        <div style="display:flex;gap:2px;border-top:1px solid var(--border);padding-top:6px">
+          ${Array.from({length:daysInMonth},(_,i)=>`<div style="flex:1;text-align:center;font-size:8px;color:var(--muted)">${(i+1)%5===1||i===0?i+1:""}</div>`).join("")}
+        </div>`;
+      document.getElementById("stat-month-title").textContent = "Podľa dňa";
+    } else {
+      // Show by month
+      const months = ["Jan","Feb","Mar","Apr","Máj","Jún","Júl","Aug","Sep","Okt","Nov","Dec"];
+      const mCounts = months.map((_,i)=>{
+        const m = String(i+1).padStart(2,"0");
+        return filtered.filter(s=>(s.date||"").slice(5,7)===m).length;
+      });
+      const maxM = Math.max(...mCounts,1);
+      document.getElementById("stat-month-title").textContent = "Podľa mesiaca";
+          ${mCounts.map((c,i)=>`
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+              <div style="font-size:10px;color:var(--muted);font-weight:500">${c||""}</div>
+              <div style="width:100%;background:var(--accent);border-radius:3px 3px 0 0;height:${Math.round(c/maxM*60)+2}px;min-height:2px;opacity:${c?1:0.15}"></div>
+            </div>`).join("")}
+        </div>
+        <div style="display:flex;gap:4px;border-top:1px solid var(--border);padding-top:6px">
+          ${months.map(m=>`<div style="flex:1;text-align:center;font-size:9px;color:var(--muted)">${m}</div>`).join("")}
+        </div>`;
+    }
   };
 
   function calcDuration(start, end) {
