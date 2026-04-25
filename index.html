@@ -537,10 +537,14 @@
     const worker = document.getElementById("s-worker").value;
     const date   = document.getElementById("s-date").value;
     const start  = document.getElementById("s-start").value;
-    if (!worker||!date||!start) { alert("Vyplňte pracovníka, dátum a čas."); return; }
+    const shift  = document.getElementById("s-shift").value;
+    if (!worker) { alert("Vyplňte pracovníka."); return; }
+    if (!date)   { alert("Vyplňte dátum."); return; }
+    if (!start)  { alert("Vyplňte čas začiatku."); return; }
+    if (!shift)  { alert("Vyplňte hliadku."); return; }
     const btn = document.getElementById("start-btn");
     btn.disabled=true; btn.textContent="Ukladanie...";
-    push(svcRef, {worker, date, startTime:start, status:"active", ts:Date.now()})
+    push(svcRef, {worker, date, startTime:start, shift, status:"active", ts:Date.now()})
       .then(()=>{ btn.disabled=false; btn.textContent="Začať službu"; });
   };
 
