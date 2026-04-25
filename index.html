@@ -182,14 +182,9 @@
 
   <!-- DENNÍK -->
   <div id="tab-dennik" style="display:none">
-    <div class="date-row">
-      <input type="date" id="filter-date" onchange="renderDennik()" />
-      <button class="today-btn" onclick="setToday()">Dnes</button>
-      <span class="day-count" id="day-count"></span>
-    </div>
     <div style="position:relative;margin-bottom:10px">
       <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--muted);pointer-events:none">🔍</span>
-      <input type="text" id="dennik-search" placeholder="Hľadať podľa pracovníka, kamera, opis..." oninput="renderDennik()"
+      <input type="text" id="dennik-search" placeholder="Hľadať podľa pracovníka, kamery, opisu..." oninput="renderDennik()"
         style="width:100%;height:40px;border:.5px solid var(--border-strong);border-radius:var(--radius);padding:0 12px 0 36px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--surface);outline:none;color:var(--text)"/>
     </div>
     <div id="dennik-list"><div class="empty">Načítavanie...</div></div>
@@ -301,7 +296,6 @@
 
   // Today
   const today = new Date().toISOString().split("T")[0];
-  document.getElementById("filter-date").value = today;
 
   function setStatus(on) {
     document.getElementById("status-dot").className = "dot"+(on?" on":"");
@@ -317,12 +311,10 @@
 
   // ── DENNÍK ──
   window.renderDennik = function() {
-    const selDate = document.getElementById("filter-date").value;
     const q = (document.getElementById("dennik-search")?.value||"").toLowerCase();
     let entries = Object.entries(allServices)
       .map(([id,v])=>({id,...v}))
-      .filter(s => !selDate || s.date === selDate)
-      .sort((a,b)=>(a.startTime||"").localeCompare(b.startTime||""));
+      .sort((a,b)=>(b.date||"").localeCompare(a.date||"") || (b.startTime||"").localeCompare(a.startTime||""));
 
     if (q) {
       entries = entries.filter(s => {
@@ -334,8 +326,6 @@
       });
     }
 
-    document.getElementById("day-count").textContent =
-      entries.length ? `${entries.length} služb${entries.length===1?"a":"y"}` : "";
 
     const container = document.getElementById("dennik-list");
     if (!entries.length) {
@@ -579,10 +569,6 @@
       .then(()=>{ btn.disabled=false; btn.textContent="Uložiť záznam"; closeModal(); });
   };
 
-  window.setToday = () => {
-    document.getElementById("filter-date").value = new Date().toISOString().split("T")[0];
-    renderDennik();
-  };
 
   window.switchTab = function(tab) {
     document.getElementById("tab-dennik").style.display = tab==="dennik" ? "" : "none";
@@ -647,19 +633,24 @@
         <div class="br-count">${c} <span style="font-size:11px;color:var(--muted)">${Math.round(c/totalServices*100)}%</span></div>
       </div>`).join("") : '<div style="font-size:13px;color:var(--muted)">Žiadne dáta</div>';
 
-    // By month
+    // By month bar chart
     const months = ["Jan","Feb","Mar","Apr","Máj","Jún","Júl","Aug","Sep","Okt","Nov","Dec"];
     const mCounts = months.map((_,i)=>{
       const m = String(i+1).padStart(2,"0");
       return filtered.filter(s=>(s.date||"").slice(5,7)===m).length;
     });
     const maxM = Math.max(...mCounts,1);
-    document.getElementById("stat-month-chart").innerHTML = months.map((m,i)=>`
-      <div class="br">
-        <div class="br-label">${m}</div>
-        <div class="br-wrap"><div class="br-bar" style="width:${Math.round(mCounts[i]/maxM*100)}%;background:var(--accent)"></div></div>
-        <div class="br-count">${mCounts[i]}</div>
-      </div>`).join("");
+    document.getElementById("stat-month-chart").innerHTML = `
+      <div style="display:flex;align-items:flex-end;gap:4px;height:80px;padding-bottom:4px">
+        ${mCounts.map((c,i)=>`
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">
+            <div style="font-size:10px;color:var(--muted);font-weight:500">${c||""}</div>
+            <div style="width:100%;background:var(--accent);border-radius:3px 3px 0 0;height:${Math.round(c/maxM*60)+2}px;min-height:2px;opacity:${c?1:0.15}"></div>
+          </div>`).join("")}
+      </div>
+      <div style="display:flex;gap:4px;border-top:1px solid var(--border);padding-top:6px">
+        ${months.map(m=>`<div style="flex:1;text-align:center;font-size:9px;color:var(--muted)">${m}</div>`).join("")}
+      </div>`;
   };
 
   function calcDuration(start, end) {
