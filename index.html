@@ -27,6 +27,19 @@
     .topbar-title { font-size: 17px; font-weight: 600; }
     .home-btn { width: 32px; height: 32px; border-radius: 8px; border: .5px solid var(--border-strong); background: var(--surface2); color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all .15s; text-decoration: none; flex-shrink: 0; }
     .home-btn:hover { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .stat-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); margin: 1.25rem 0 8px; }
+    .stat-title:first-child { margin-top: 0; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 4px; }
+    .kpi-card { background: var(--surface); border-radius: var(--radius-lg); border: .5px solid var(--border); padding: 14px; text-align: center; }
+    .kpi-num { font-size: 26px; font-weight: 600; line-height: 1; }
+    .kpi-label { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .chart-card { background: var(--surface); border-radius: var(--radius-lg); border: .5px solid var(--border); padding: 14px; margin-bottom: 8px; }
+    .br { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .br:last-child { margin-bottom: 0; }
+    .br-label { font-size: 12px; min-width: 80px; }
+    .br-wrap { flex: 1; background: var(--surface2); border-radius: 4px; height: 8px; overflow: hidden; }
+    .br-bar { height: 100%; border-radius: 4px; transition: width .4s; }
+    .br-count { font-size: 12px; font-weight: 500; min-width: 44px; text-align: right; }
     .status-pill { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); background: var(--surface2); border-radius: 20px; padding: 4px 10px; }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; transition: background 0.3s; }
     .dot.on { background: #3da45a; }
@@ -174,10 +187,39 @@
       <button class="today-btn" onclick="setToday()">Dnes</button>
       <span class="day-count" id="day-count"></span>
     </div>
+    <div style="position:relative;margin-bottom:10px">
+      <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:15px;color:var(--muted);pointer-events:none">🔍</span>
+      <input type="text" id="dennik-search" placeholder="Hľadať podľa pracovníka, kamera, opis..." oninput="renderDennik()"
+        style="width:100%;height:40px;border:.5px solid var(--border-strong);border-radius:var(--radius);padding:0 12px 0 36px;font-family:'DM Sans',sans-serif;font-size:14px;background:var(--surface);outline:none;color:var(--text)"/>
+    </div>
     <div id="dennik-list"><div class="empty">Načítavanie...</div></div>
   </div>
 
-  <!-- SLUŽBA -->
+  <!-- ŠTATISTIKY -->
+  <div id="tab-stats" style="display:none">
+    <div class="stat-title">Celkový prehľad</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <select id="stat-year" onchange="renderStats()" style="flex:1;height:36px;border:.5px solid var(--border-strong);border-radius:var(--radius);padding:0 8px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--surface);outline:none">
+        <option value="">Všetky roky</option>
+      </select>
+      <select id="stat-month" onchange="renderStats()" style="flex:1;height:36px;border:.5px solid var(--border-strong);border-radius:var(--radius);padding:0 8px;font-family:'DM Sans',sans-serif;font-size:13px;background:var(--surface);outline:none">
+        <option value="">Všetky mesiace</option>
+        <option value="01">Január</option><option value="02">Február</option>
+        <option value="03">Marec</option><option value="04">Apríl</option>
+        <option value="05">Máj</option><option value="06">Jún</option>
+        <option value="07">Júl</option><option value="08">August</option>
+        <option value="09">September</option><option value="10">Október</option>
+        <option value="11">November</option><option value="12">December</option>
+      </select>
+    </div>
+    <div class="kpi-grid" id="stat-kpi"></div>
+    <div class="stat-title">Podľa hliadky</div>
+    <div class="chart-card" id="stat-shift"></div>
+    <div class="stat-title">Podľa pracovníka</div>
+    <div class="chart-card" id="stat-worker"></div>
+    <div class="stat-title">Podľa mesiaca</div>
+    <div class="chart-card" id="stat-month-chart"></div>
+  </div>
   <div id="tab-sluzba">
     <div id="sluzba-content"></div>
   </div>
@@ -218,6 +260,10 @@
   <div class="nav-item" id="nav-dennik" onclick="switchTab('dennik')">
     <span class="nav-icon">📋</span>
     <span class="nav-label">Denník</span>
+  </div>
+  <div class="nav-item" id="nav-stats" onclick="switchTab('stats')">
+    <span class="nav-icon">📊</span>
+    <span class="nav-label">Štatistiky</span>
   </div>
 </nav>
 
@@ -272,10 +318,21 @@
   // ── DENNÍK ──
   window.renderDennik = function() {
     const selDate = document.getElementById("filter-date").value;
-    const entries = Object.entries(allServices)
+    const q = (document.getElementById("dennik-search")?.value||"").toLowerCase();
+    let entries = Object.entries(allServices)
       .map(([id,v])=>({id,...v}))
       .filter(s => !selDate || s.date === selDate)
       .sort((a,b)=>(a.startTime||"").localeCompare(b.startTime||""));
+
+    if (q) {
+      entries = entries.filter(s => {
+        const inHeader = [s.worker, s.shift, s.date].some(v=>(v||"").toLowerCase().includes(q));
+        const inRecords = s.records ? Object.values(s.records).some(r=>
+          [r.camera, r.description].some(v=>(v||"").toLowerCase().includes(q))
+        ) : false;
+        return inHeader || inRecords;
+      });
+    }
 
     document.getElementById("day-count").textContent =
       entries.length ? `${entries.length} služb${entries.length===1?"a":"y"}` : "";
@@ -530,10 +587,79 @@
   window.switchTab = function(tab) {
     document.getElementById("tab-dennik").style.display = tab==="dennik" ? "" : "none";
     document.getElementById("tab-sluzba").style.display = tab==="sluzba" ? "" : "none";
+    document.getElementById("tab-stats").style.display  = tab==="stats"  ? "" : "none";
     document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
     document.getElementById("nav-"+tab).classList.add("active");
     if (tab==="dennik") renderDennik();
     if (tab==="sluzba") renderSluzba();
+    if (tab==="stats")  renderStats();
+  };
+
+  window.renderStats = function() {
+    const services = Object.values(allServices);
+    const selYear  = document.getElementById("stat-year")?.value||"";
+    const selMonth = document.getElementById("stat-month")?.value||"";
+
+    // Populate year dropdown
+    const years = [...new Set(services.map(s=>(s.date||"").slice(0,4)).filter(Boolean))].sort().reverse();
+    const ySel = document.getElementById("stat-year");
+    if (ySel && ySel.options.length === 1) {
+      years.forEach(y => { const o=document.createElement("option"); o.value=y; o.textContent=y; ySel.appendChild(o); });
+    }
+    if (selYear) ySel.value = selYear;
+
+    // Filter services
+    let filtered = services.filter(s => s.status !== "active");
+    if (selYear)  filtered = filtered.filter(s=>(s.date||"").startsWith(selYear));
+    if (selMonth) filtered = filtered.filter(s=>(s.date||"").slice(5,7)===selMonth);
+
+    // Count total events across all filtered services
+    const totalEvents = filtered.reduce((sum,s)=>sum+(s.records?Object.keys(s.records).length:0),0);
+    const totalServices = filtered.length;
+
+    // KPI
+    document.getElementById("stat-kpi").innerHTML = `
+      <div class="kpi-card"><div class="kpi-num">${totalServices}</div><div class="kpi-label">Služby</div></div>
+      <div class="kpi-card"><div class="kpi-num">${totalEvents}</div><div class="kpi-label">Udalosti</div></div>
+      <div class="kpi-card"><div class="kpi-num">${totalServices?Math.round(totalEvents/totalServices*10)/10:0}</div><div class="kpi-label">Udalostí/službu</div></div>`;
+
+    // By shift
+    const shifts = ["A","B","C","D"];
+    const shiftCounts = shifts.map(sh=>filtered.filter(s=>s.shift===sh).length);
+    const maxSh = Math.max(...shiftCounts,1);
+    const colors = ["#1d5fa8","#2d6a4f","#b45309","#c0392b"];
+    document.getElementById("stat-shift").innerHTML = shifts.map((sh,i)=>`
+      <div class="br">
+        <div class="br-label">Hliadka ${sh}</div>
+        <div class="br-wrap"><div class="br-bar" style="width:${Math.round(shiftCounts[i]/maxSh*100)}%;background:${colors[i]}"></div></div>
+        <div class="br-count">${shiftCounts[i]} <span style="font-size:11px;color:var(--muted)">${totalServices?Math.round(shiftCounts[i]/totalServices*100):0}%</span></div>
+      </div>`).join("");
+
+    // By worker
+    const workerMap = {};
+    filtered.forEach(s=>{ if(s.worker) workerMap[s.worker]=(workerMap[s.worker]||0)+1; });
+    const workers = Object.entries(workerMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const maxW = Math.max(...workers.map(w=>w[1]),1);
+    document.getElementById("stat-worker").innerHTML = workers.length ? workers.map(([w,c])=>`
+      <div class="br">
+        <div class="br-label">${w}</div>
+        <div class="br-wrap"><div class="br-bar" style="width:${Math.round(c/maxW*100)}%;background:var(--accent)"></div></div>
+        <div class="br-count">${c} <span style="font-size:11px;color:var(--muted)">${Math.round(c/totalServices*100)}%</span></div>
+      </div>`).join("") : '<div style="font-size:13px;color:var(--muted)">Žiadne dáta</div>';
+
+    // By month
+    const months = ["Jan","Feb","Mar","Apr","Máj","Jún","Júl","Aug","Sep","Okt","Nov","Dec"];
+    const mCounts = months.map((_,i)=>{
+      const m = String(i+1).padStart(2,"0");
+      return filtered.filter(s=>(s.date||"").slice(5,7)===m).length;
+    });
+    const maxM = Math.max(...mCounts,1);
+    document.getElementById("stat-month-chart").innerHTML = months.map((m,i)=>`
+      <div class="br">
+        <div class="br-label">${m}</div>
+        <div class="br-wrap"><div class="br-bar" style="width:${Math.round(mCounts[i]/maxM*100)}%;background:var(--accent)"></div></div>
+        <div class="br-count">${mCounts[i]}</div>
+      </div>`).join("");
   };
 
   function calcDuration(start, end) {
